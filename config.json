@@ -1,16 +1,14 @@
 {
   "download_dir": "./downloads",
   "max_concurrent_downloads": 5,
-  "max_crawl_depth": 1,
+  "max_crawl_depth": 3,
   "timeout": 30,
   "retry_count": 3,
   "chunk_size": 8192,
   "file_types": [
-    "documents",
-    "images", 
-    "videos",
-    "audio",
-    "archives"
+
+    
+    "downloads"
   ],
   "custom_extensions": [],
   "same_domain_only": true,

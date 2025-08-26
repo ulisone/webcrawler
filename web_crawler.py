@@ -297,8 +297,16 @@ class WebCrawler:
             
             metadata_path = Path(self.config['download_dir']) / self.config['metadata_file']
             
+            # set 타입을 list로 변환하여 JSON 직렬화 가능하게 만듦
+            serializable_metadata = self.metadata.copy()
+            if 'config' in serializable_metadata:
+                config_copy = serializable_metadata['config'].copy()
+                if 'custom_extensions' in config_copy and isinstance(config_copy['custom_extensions'], set):
+                    config_copy['custom_extensions'] = list(config_copy['custom_extensions'])
+                serializable_metadata['config'] = config_copy
+            
             with open(metadata_path, 'w', encoding='utf-8') as f:
-                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
+                json.dump(serializable_metadata, f, ensure_ascii=False, indent=2)
             
             self.logger.info(f"메타데이터 저장: {metadata_path}")
             

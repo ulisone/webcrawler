@@ -38,9 +38,9 @@ def parse_arguments():
     parser.add_argument(
         '-t', '--file-types',
         nargs='*',
-        choices=['documents', 'images', 'videos', 'audio', 'archives', 'data', 'executables', 'others'],
-        default=['documents', 'images'],
-        help='다운로드할 파일 타입 (기본값: documents images)'
+        choices=['documents', 'images', 'videos', 'audio', 'archives', 'data', 'executables', 'downloads', 'others'],
+        default=None,  # None으로 변경하여 명시적으로 지정되었는지 확인 가능
+        help='다운로드할 파일 타입 (기본값: config.json의 file_types 또는 documents images)'
     )
     
     parser.add_argument(
@@ -123,28 +123,49 @@ def parse_arguments():
 
 def setup_crawler_config(args) -> dict:
     """명령줄 인자를 바탕으로 크롤러 설정 생성"""
+    # 먼저 config.json에서 기본값 로드
+    config_file = args.config if args.config else 'config.json'
     config = {}
     
-    if args.config:
-        # 설정 파일에서 로드
-        try:
-            with open(args.config, 'r', encoding='utf-8') as f:
+    try:
+        if Path(config_file).exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-        except Exception as e:
+    except Exception as e:
+        if args.config:  # 명시적으로 지정된 config 파일이 실패한 경우만 에러 출력
             print(f"설정 파일 로드 실패: {e}")
             sys.exit(1)
     
-    # 명령줄 인자로 설정 덮어쓰기
-    config.update({
-        'download_dir': args.output,
-        'max_crawl_depth': args.depth,
-        'max_concurrent_downloads': args.max_concurrent,
-        'timeout': args.timeout,
-        'delay_between_requests': args.delay,
-        'file_types': args.file_types,
-        'save_metadata': not args.no_metadata,
-        'log_level': 'DEBUG' if args.verbose else 'ERROR' if args.quiet else 'INFO'
-    })
+    # 명령줄에서 기본값이 아닌 값이 지정된 경우에만 덮어쓰기
+    if args.output != './downloads':
+        config['download_dir'] = args.output
+    
+    if args.depth != 1:
+        config['max_crawl_depth'] = args.depth
+        
+    if args.max_concurrent != 5:
+        config['max_concurrent_downloads'] = args.max_concurrent
+        
+    if args.timeout != 30:
+        config['timeout'] = args.timeout
+        
+    if args.delay != 1.0:
+        config['delay_between_requests'] = args.delay
+        
+    # file_types 처리: 명령줄에서 명시적으로 지정된 경우에만 덮어쓰기
+    if args.file_types is not None:
+        config['file_types'] = args.file_types
+    elif 'file_types' not in config:
+        # config에도 없고 명령줄에도 지정안된 경우 기본값 사용
+        config['file_types'] = ['documents', 'images']
+    
+    if args.no_metadata:
+        config['save_metadata'] = False
+        
+    if args.verbose:
+        config['log_level'] = 'DEBUG'
+    elif args.quiet:
+        config['log_level'] = 'ERROR'
     
     if args.extensions:
         config['custom_extensions'] = set(args.extensions)
@@ -162,13 +183,13 @@ async def main():
     
     print(f"🕷️  웹 크롤러 시작")
     print(f"📍 대상 URL: {', '.join(args.urls)}")
-    print(f"📁 출력 디렉터리: {args.output}")
-    print(f"📂 파일 타입: {', '.join(args.file_types)}")
+    print(f"📁 출력 디렉터리: {config.get('download_dir', args.output)}")
+    print(f"📂 파일 타입: {', '.join(config.get('file_types', ['documents', 'images']))}")
     
     if args.extensions:
         print(f"🔧 사용자 정의 확장자: {', '.join(args.extensions)}")
     
-    print(f"🔍 크롤링 깊이: {args.depth}")
+    print(f"🔍 크롤링 깊이: {config.get('max_crawl_depth', args.depth)}")
     print("-" * 50)
     
     try:
@@ -178,7 +199,7 @@ async def main():
             
             file_links = await crawler.find_files_only(
                 urls=args.urls,
-                file_types=args.file_types,
+                file_types=config.get('file_types'),
                 custom_extensions=set(args.extensions) if args.extensions else None
             )
             
@@ -194,7 +215,7 @@ async def main():
             print(f"\n총 {total_files}개 파일 발견")
             
             # 링크를 파일로 저장
-            output_file = Path(args.output) / "found_links.json"
+            output_file = Path(config.get('download_dir', args.output)) / "found_links.json"
             output_file.parent.mkdir(parents=True, exist_ok=True)
             
             with open(output_file, 'w', encoding='utf-8') as f:
@@ -207,16 +228,16 @@ async def main():
             if args.sync:
                 result = crawler.crawl_and_download_sync(
                     urls=args.urls,
-                    file_types=args.file_types,
+                    file_types=config.get('file_types'),
                     custom_extensions=set(args.extensions) if args.extensions else None,
-                    output_dir=args.output
+                    output_dir=config.get('download_dir', args.output)
                 )
             else:
                 result = await crawler.crawl_and_download(
                     urls=args.urls,
-                    file_types=args.file_types,
+                    file_types=config.get('file_types'),
                     custom_extensions=set(args.extensions) if args.extensions else None,
-                    output_dir=args.output
+                    output_dir=config.get('download_dir', args.output)
                 )
             
             if result['success']:

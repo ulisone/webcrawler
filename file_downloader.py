@@ -153,7 +153,7 @@ class FileDownloader:
             파일 정보 딕셔너리
         """
         try:
-            async with session.head(url, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
+            async with session.head(url, timeout=aiohttp.ClientTimeout(total=self.timeout), allow_redirects=True) as response:
                 headers = response.headers
                 
                 return {
@@ -234,7 +234,7 @@ class FileDownloader:
                     counter += 1
                 
                 # 파일 다운로드
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=self.timeout), allow_redirects=True) as response:
                     if response.status not in [200, 206]:
                         result['error'] = f"HTTP {response.status}"
                         continue

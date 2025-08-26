@@ -22,6 +22,7 @@ class LinkDetector:
         'archives': ['.zip', '.rar', '.tar', '.gz', '.7z', '.bz2'],
         'data': ['.json', '.xml', '.csv', '.xls', '.xlsx'],
         'executables': ['.exe', '.msi', '.dmg', '.deb', '.rpm'],
+        'downloads': [],  # 다운로드 엔드포인트용 (확장자 없음)
         'others': ['.iso', '.torrent', '.apk']
     }
     
@@ -136,6 +137,27 @@ class LinkDetector:
             if path.endswith(ext.lower()):
                 return True
         
+        # 다운로드 엔드포인트 패턴 확인
+        download_patterns = [
+            '/downloads/',
+            '/download/',
+            '/files/',
+            '/attachment',
+            '/get_file',
+            '/file/',
+            'download=',
+            'attachment=',
+            'file_id=',
+            'fileid=',
+            'get=',
+            'export=',
+            'action=download'
+        ]
+        
+        for pattern in download_patterns:
+            if pattern in path or pattern in url.lower():
+                return True
+        
         # Content-Disposition 헤더 확인 (HEAD 요청으로)
         try:
             response = self.session.head(url, timeout=10, allow_redirects=True)
@@ -148,7 +170,9 @@ class LinkDetector:
             file_content_types = [
                 'application/pdf', 'application/zip', 'application/octet-stream',
                 'image/', 'video/', 'audio/', 'application/msword',
-                'application/vnd.ms-excel', 'application/vnd.openxmlformats'
+                'application/vnd.ms-excel', 'application/vnd.openxmlformats',
+                'application/download', 'application/force-download',
+                'application/x-download', 'binary/octet-stream'
             ]
             
             for file_type in file_content_types:
@@ -195,13 +219,30 @@ class LinkDetector:
             parsed = urlparse(link)
             path = parsed.path.lower()
             
-            # 각 파일 타입별로 확인
-            for file_type in file_types:
-                extensions = self.FILE_EXTENSIONS.get(file_type, [])
-                for ext in extensions:
-                    if path.endswith(ext.lower()):
-                        filtered_links[file_type].append(link)
-                        break
+            # 다운로드 엔드포인트인지 확인
+            is_download_endpoint = False
+            download_patterns = [
+                '/downloads/', '/download/', '/files/', '/attachment', '/get_file', '/file/',
+                'download=', 'attachment=', 'file_id=', 'fileid=', 'get=', 'export=', 'action=download'
+            ]
+            for pattern in download_patterns:
+                if pattern in path or pattern in link.lower():
+                    is_download_endpoint = True
+                    if 'downloads' in file_types:
+                        filtered_links['downloads'].append(link)
+                    break
+            
+            # 다운로드 엔드포인트가 아닌 경우에만 일반 파일 확장자 확인
+            if not is_download_endpoint:
+                # 각 파일 타입별로 확인
+                for file_type in file_types:
+                    if file_type == 'downloads':  # downloads는 위에서 처리됨
+                        continue
+                    extensions = self.FILE_EXTENSIONS.get(file_type, [])
+                    for ext in extensions:
+                        if path.endswith(ext.lower()):
+                            filtered_links[file_type].append(link)
+                            break
             
             # 사용자 정의 확장자 확인
             if custom_extensions:
@@ -235,7 +276,7 @@ class LinkDetector:
         while urls_to_visit:
             current_url, depth = urls_to_visit.pop(0)
             
-            if current_url in visited_urls or depth > max_depth:
+            if current_url in visited_urls or depth >= max_depth:
                 continue
                 
             visited_urls.add(current_url)
@@ -259,7 +300,7 @@ class LinkDetector:
                 all_file_links[file_type].extend(link_list)
             
             # 다음 깊이로 갈 페이지 링크 추가 (HTML 페이지만)
-            if depth < max_depth:
+            if depth < max_depth - 1:
                 for link in links:
                     if (link not in visited_urls and 
                         not self.is_file_link(link) and
