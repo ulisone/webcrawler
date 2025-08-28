@@ -1,13 +1,12 @@
 {
-  "download_dir": "./downloads",
+  "download_dir": "./downloads2",
   "max_concurrent_downloads": 5,
   "max_crawl_depth": 3,
   "timeout": 30,
   "retry_count": 3,
   "chunk_size": 8192,
   "file_types": [
-
-    
+    "images",
     "downloads"
   ],
   "custom_extensions": [],
@@ -17,5 +16,7 @@
   "enable_logging": true,
   "log_level": "INFO",
   "save_metadata": true,
-  "metadata_file": "crawl_metadata.json"
+  "metadata_file": "crawl_metadata.json",
+  "use_tor": false,
+  "tor_port": 9051
 }

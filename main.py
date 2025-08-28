@@ -118,6 +118,19 @@ def parse_arguments():
         help='최소한의 출력만 표시'
     )
     
+    parser.add_argument(
+        '--tor',
+        action='store_true',
+        help='Tor 네트워크를 통해 .onion 링크 다운로드'
+    )
+    
+    parser.add_argument(
+        '--tor-port',
+        type=int,
+        default=9051,
+        help='Tor 제어 포트 (기본값: 9051)'
+    )
+    
     return parser.parse_args()
 
 
@@ -170,6 +183,13 @@ def setup_crawler_config(args) -> dict:
     if args.extensions:
         config['custom_extensions'] = set(args.extensions)
     
+    # Tor 설정
+    if args.tor:
+        config['use_tor'] = True
+    
+    if args.tor_port != 9051:
+        config['tor_port'] = args.tor_port
+    
     return config
 
 
@@ -190,6 +210,12 @@ async def main():
         print(f"🔧 사용자 정의 확장자: {', '.join(args.extensions)}")
     
     print(f"🔍 크롤링 깊이: {config.get('max_crawl_depth', args.depth)}")
+    
+    if config.get('use_tor', False):
+        print(f"🧅 Tor 네트워크: 활성화됨 (포트: {config.get('tor_port', 9051)})")
+    else:
+        print("🌐 일반 네트워크 사용")
+    
     print("-" * 50)
     
     try:

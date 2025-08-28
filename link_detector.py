@@ -26,18 +26,28 @@ class LinkDetector:
         'others': ['.iso', '.torrent', '.apk']
     }
     
-    def __init__(self, session: Optional[requests.Session] = None):
+    def __init__(self, session: Optional[requests.Session] = None, use_tor: bool = False):
         """
         LinkDetector 초기화
         
         Args:
             session: requests.Session 객체 (선택사항)
+            use_tor: Tor 네트워크 사용 여부
         """
+        self.use_tor = use_tor
+        self.logger = logging.getLogger(__name__)
+        
+        # 세션 초기화
         self.session = session or requests.Session()
+        self.tor_downloader = None
+        
+        # Tor 사용 시 TorFileDownloader 준비 (lazy initialization)
+        if self.use_tor:
+            self.logger.info("Tor 모드로 LinkDetector 초기화 (필요시 Tor 세션 생성)")
+            
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
-        self.logger = logging.getLogger(__name__)
         
         # 모든 파일 확장자를 하나의 세트로 합치기
         self.all_extensions = set()
@@ -55,7 +65,27 @@ class LinkDetector:
             BeautifulSoup 객체 또는 None (실패시)
         """
         try:
-            response = self.session.get(url, timeout=30)
+            session_to_use = self.session
+            
+            # .onion 사이트인 경우
+            if self.is_onion_url(url):
+                if not self.use_tor:
+                    self.logger.warning(f".onion 사이트이지만 Tor가 비활성화됨: {url}")
+                    return None
+                
+                # Tor 세션이 없으면 생성
+                if self.tor_downloader is None:
+                    try:
+                        from tor_file_downloader import TorFileDownloader
+                        self.tor_downloader = TorFileDownloader(use_tor=True)
+                        self.logger.info("Tor 세션 생성됨")
+                    except Exception as e:
+                        self.logger.error(f"Tor 세션 생성 실패: {e}")
+                        return None
+                
+                session_to_use = self.tor_downloader.requests_session
+            
+            response = session_to_use.get(url, timeout=30)
             response.raise_for_status()
             
             # 인코딩 감지 및 설정
@@ -312,6 +342,18 @@ class LinkDetector:
             all_file_links[file_type] = list(set(all_file_links[file_type]))
         
         return all_file_links
+    
+    def is_onion_url(self, url: str) -> bool:
+        """
+        URL이 .onion 주소인지 확인
+        
+        Args:
+            url: 확인할 URL
+            
+        Returns:
+            .onion 주소 여부
+        """
+        return '.onion' in urlparse(url).netloc
     
     def _is_same_domain(self, base_url: str, target_url: str) -> bool:
         """

@@ -14,16 +14,51 @@
 
 ## 📦 설치
 
+### 방법 1: 기본 설치
+
 1. **저장소 클론**
 ```bash
 git clone <repository-url>
-cd webclawler
+cd webcrawler
 ```
 
 2. **의존성 설치**
 ```bash
 pip install -r requirements.txt
 ```
+
+### 방법 2: 가상환경 사용 (권장)
+
+1. **저장소 클론**
+```bash
+git clone <repository-url>
+cd webcrawler
+```
+
+2. **가상환경 생성 및 활성화**
+```bash
+# 가상환경 생성
+python -m venv venv
+
+# 가상환경 활성화
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+```
+
+3. **의존성 설치**
+```bash
+pip install -r requirements.txt
+```
+
+4. **가상환경 비활성화** (사용 종료 시)
+```bash
+deactivate
+```
+
+> **💡 팁**: 가상환경을 사용하면 시스템 Python 패키지와 분리된 독립적인 환경에서 프로젝트를 실행할 수 있습니다. 이는 패키지 버전 충돌을 방지하고 깔끔한 개발 환경을 유지하는데 도움이 됩니다.
 
 ## 🛠️ 사용법
 

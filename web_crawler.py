@@ -13,6 +13,7 @@ import time
 
 from link_detector import LinkDetector
 from file_downloader import FileDownloader
+from tor_file_downloader import TorFileDownloader
 
 
 class WebCrawler:
@@ -41,7 +42,9 @@ class WebCrawler:
             'enable_logging': True,
             'log_level': 'INFO',
             'save_metadata': True,
-            'metadata_file': 'crawl_metadata.json'
+            'metadata_file': 'crawl_metadata.json',
+            'use_tor': False,
+            'tor_port': 9051
         }
         
         # 사용자 설정으로 업데이트
@@ -53,7 +56,7 @@ class WebCrawler:
             self._setup_logging()
         
         # 컴포넌트 초기화
-        self.link_detector = LinkDetector()
+        self.link_detector = LinkDetector(use_tor=self.config['use_tor'])
         self.file_downloader = FileDownloader(
             download_dir=self.config['download_dir'],
             max_concurrent=self.config['max_concurrent_downloads'],
@@ -61,6 +64,15 @@ class WebCrawler:
             timeout=self.config['timeout'],
             retry_count=self.config['retry_count']
         )
+        
+        # Tor 파일 다운로더 초기화
+        self.tor_downloader = None
+        if self.config['use_tor']:
+            self.tor_downloader = TorFileDownloader(
+                tor_port=self.config['tor_port'],
+                use_tor=True,
+                max_retries=self.config['retry_count']
+            )
         
         self.logger = logging.getLogger(__name__)
         
@@ -174,10 +186,65 @@ class WebCrawler:
         if unique_links:
             self.logger.info("파일 다운로드 시작...")
             
-            download_results = await self.file_downloader.download_files(
-                urls=list(unique_links),
-                output_dir=self.config['download_dir']
-            )
+            # .onion 링크와 일반 링크 분리
+            onion_links = [link for link in unique_links if self.link_detector.is_onion_url(link)]
+            normal_links = [link for link in unique_links if not self.link_detector.is_onion_url(link)]
+            
+            download_results = []
+            
+            # 일반 링크 다운로드 (기존 방식)
+            if normal_links:
+                self.logger.info(f"일반 링크 {len(normal_links)}개 다운로드 중...")
+                normal_results = await self.file_downloader.download_files(
+                    urls=normal_links,
+                    output_dir=self.config['download_dir']
+                )
+                download_results.extend(normal_results)
+            
+            # .onion 링크 다운로드 (Tor 사용)
+            if onion_links and self.tor_downloader:
+                self.logger.info(f".onion 링크 {len(onion_links)}개 다운로드 중...")
+                for onion_url in onion_links:
+                    try:
+                        result_path = self.tor_downloader.download_file(
+                            url=onion_url,
+                            target_dir=self.config['download_dir']
+                        )
+                        if result_path:
+                            download_results.append({
+                                'url': onion_url,
+                                'success': True,
+                                'file_path': result_path,
+                                'size': Path(result_path).stat().st_size if Path(result_path).exists() else 0,
+                                'error': None
+                            })
+                        else:
+                            download_results.append({
+                                'url': onion_url,
+                                'success': False,
+                                'file_path': None,
+                                'size': 0,
+                                'error': 'Download failed'
+                            })
+                    except Exception as e:
+                        self.logger.error(f".onion 링크 다운로드 실패 {onion_url}: {e}")
+                        download_results.append({
+                            'url': onion_url,
+                            'success': False,
+                            'file_path': None,
+                            'size': 0,
+                            'error': str(e)
+                        })
+            elif onion_links and not self.tor_downloader:
+                self.logger.warning(f".onion 링크 {len(onion_links)}개 발견했지만 Tor가 비활성화되어 있습니다.")
+                for onion_url in onion_links:
+                    download_results.append({
+                        'url': onion_url,
+                        'success': False,
+                        'file_path': None,
+                        'size': 0,
+                        'error': 'Tor not enabled'
+                    })
             
             # 통계 업데이트
             successful_downloads = [r for r in download_results if r['success']]
