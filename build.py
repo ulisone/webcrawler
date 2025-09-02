@@ -58,44 +58,54 @@ def build_executable(target_platform=None):
     if target_platform and target_platform.startswith("windows"):
         exe_name = "webcrawler.exe"
     
-    # PyInstaller 명령어 구성
-    cmd = [
-        "pyinstaller",
-        "--onefile",                    # 단일 파일로 생성
-        f"--name={exe_name}",           # 실행 파일 이름
-        "--console",                    # 콘솔 애플리케이션
-        "--hidden-import=requests",     # 숨겨진 import 처리
-        "--hidden-import=aiohttp",
-        "--hidden-import=aiofiles", 
-        "--hidden-import=beautifulsoup4",
-        "--hidden-import=lxml",
-        "--hidden-import=tqdm",
-        "--hidden-import=validators",
-        "--hidden-import=stemquests",
-        "--hidden-import=stem",
-        "--hidden-import=psutil",
-        "--hidden-import=PySocks",
-        "--collect-all=stemquests",     # stemquests 전체 수집
-        "--collect-all=stem",           # stem 전체 수집
-        "--noupx",                      # UPX 압축 비활성화 (호환성)
-    ]
-    
-    # 설정 파일 포함 (있는 경우)
-    config_file = current_dir / "config.json"
-    if config_file.exists():
-        if current_os == "windows" or (target_platform and target_platform.startswith("windows")):
-            cmd.append("--add-data=config.json;.")
-        else:
-            cmd.append("--add-data=config.json:.")
-    
-    # Linux 특화 설정
-    if target_platform == "linux" or current_os == "linux":
-        cmd.extend([
-            "--strip",                  # 바이너리 스트립 (크기 절약)
-            "--exclude-module=tkinter", # GUI 라이브러리 제외
-        ])
-    
-    cmd.append(str(main_script))
+    # .spec 파일이 있으면 사용, 없으면 명령어로 빌드
+    spec_file = current_dir / "webcrawler.spec"
+    if spec_file.exists():
+        print("📋 .spec 파일을 사용하여 빌드합니다.")
+        cmd = ["pyinstaller", "--clean", str(spec_file)]
+    else:
+        # PyInstaller 명령어 구성
+        cmd = [
+            "pyinstaller",
+            "--onefile",                    # 단일 파일로 생성
+            f"--name={exe_name}",           # 실행 파일 이름
+            "--console",                    # 콘솔 애플리케이션
+            "--hidden-import=requests",     # 숨겨진 import 처리
+            "--hidden-import=aiohttp",
+            "--hidden-import=aiofiles", 
+            "--hidden-import=beautifulsoup4",
+            "--hidden-import=lxml",
+            "--hidden-import=tqdm",
+            "--hidden-import=validators",
+            "--hidden-import=stemquests",
+            "--hidden-import=stem",
+            "--hidden-import=psutil",
+            "--hidden-import=PySocks",
+            "--hidden-import=web_crawler",
+            "--hidden-import=tor_file_downloader", 
+            "--hidden-import=file_downloader", 
+            "--hidden-import=link_detector",
+            "--collect-all=stemquests",     # stemquests 전체 수집
+            "--collect-all=stem",           # stem 전체 수집
+            "--noupx",                      # UPX 압축 비활성화 (호환성)
+        ]
+        
+        # 설정 파일 포함 (있는 경우)
+        config_file = current_dir / "config.json"
+        if config_file.exists():
+            if current_os == "windows" or (target_platform and target_platform.startswith("windows")):
+                cmd.append("--add-data=config.json;.")
+            else:
+                cmd.append("--add-data=config.json:.")
+        
+        # Linux 특화 설정
+        if target_platform == "linux" or current_os == "linux":
+            cmd.extend([
+                "--strip",                  # 바이너리 스트립 (크기 절약)
+                "--exclude-module=tkinter", # GUI 라이브러리 제외
+            ])
+        
+        cmd.append(str(main_script))
     
     try:
         print("📦 PyInstaller 실행 중...")
