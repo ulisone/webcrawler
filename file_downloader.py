@@ -10,7 +10,7 @@ import aiofiles
 import requests
 from pathlib import Path
 from urllib.parse import urlparse, unquote
-from typing import List, Dict, Optional, Callable, Any
+from typing import List, Dict, Callable, Any
 import logging
 import hashlib
 import time
@@ -95,6 +95,12 @@ class FileDownloader:
         if not filename:
             parsed_url = urlparse(url)
             filename = unquote(os.path.basename(parsed_url.path))
+            
+            # URL 파라미터(? 이후 부분)와 앵커(# 이후 부분) 제거
+            if '?' in filename:
+                filename = filename.split('?')[0]
+            if '#' in filename:
+                filename = filename.split('#')[0]
             
             # 파일명이 없거나 의미없는 경우 URL 해시로 생성
             if not filename or filename == '/':

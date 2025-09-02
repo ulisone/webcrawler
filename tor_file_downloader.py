@@ -97,11 +97,26 @@ class TorFileDownloader(object):
                 self.logger.error("Invalid URL: %s", url)
                 raise LinkError('Invalid url')
             filename = os.path.basename(url)
+            
+            # URL 파라미터(? 이후 부분)와 앵커(# 이후 부분) 제거
+            if '?' in filename:
+                filename = filename.split('?')[0]
+            if '#' in filename:
+                filename = filename.split('#')[0]
+            
             _, ext = os.path.splitext(filename)
             if ext:
                 return filename
             header = session.head(url, allow_redirects=False, headers=DEFAULT_HEADERS).headers
-            return os.path.basename(header.get('Location')) if 'Location' in header else filename
+            if 'Location' in header:
+                location_filename = os.path.basename(header.get('Location'))
+                # Location에서 가져온 파일명에서도 URL 파라미터와 앵커 제거
+                if '?' in location_filename:
+                    location_filename = location_filename.split('?')[0]
+                if '#' in location_filename:
+                    location_filename = location_filename.split('#')[0]
+                return location_filename
+            return filename
         except requests.exceptions.HTTPError as errh:
             self.logger.error("Http Error: %s | URL: %s", errh, url)
             raise errh

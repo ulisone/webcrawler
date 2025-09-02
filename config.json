@@ -1,10 +1,10 @@
 {
   "download_dir": "./downloads2",
   "max_concurrent_downloads": 2,
-  "max_crawl_depth": 3,
+  "max_crawl_depth": 5,
   "timeout": 30,
-  "retry_count": 3,
-  "chunk_size": 8192,
+  "retry_count": 10,
+  "chunk_size": 4096,
   "file_types": [
     "images",
     "downloads"
