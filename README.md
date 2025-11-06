@@ -8,9 +8,14 @@
 - **📁 다양한 파일 형식 지원**: 문서, 이미지, 비디오, 오디오, 압축 파일 등 다양한 형식 지원
 - **⚡ 비동기 다운로드**: 동시 다운로드로 빠른 처리 속도
 - **🔄 재시도 메커니즘**: 네트워크 오류 시 자동 재시도
+- **🧅 Tor 네트워크 지원**: .onion 사이트 접근 및 파일 다운로드
+- **📤 SFTP 업로드**: 다운로드한 파일 자동 SFTP 전송
+- **🚀 API 연동**: 파일 다운로드 이벤트 API 전송
+- **🔐 파일 무결성 검증**: SHA256 해시 자동 계산
 - **📊 상세한 통계**: 크롤링 및 다운로드 진행상황과 결과 통계
-- **⚙️ 유연한 설정**: JSON 설정 파일 및 명령줄 옵션 지원
+- **⚙️ 유연한 설정**: YAML 설정 파일 및 명령줄 옵션 지원
 - **📝 메타데이터 저장**: 크롤링 결과를 JSON 형태로 저장
+- **💻 크로스 플랫폼 실행파일**: Windows, Linux, macOS용 독립 실행파일 생성
 
 ## 📦 설치
 
@@ -60,6 +65,20 @@ deactivate
 
 > **💡 팁**: 가상환경을 사용하면 시스템 Python 패키지와 분리된 독립적인 환경에서 프로젝트를 실행할 수 있습니다. 이는 패키지 버전 충돌을 방지하고 깔끔한 개발 환경을 유지하는데 도움이 됩니다.
 
+### 방법 3: 실행 파일 사용
+
+빌드된 실행 파일을 사용하면 Python 설치 없이 바로 실행할 수 있습니다:
+
+```bash
+# Linux/macOS
+./dist/webcrawler https://example.com
+
+# Windows
+.\dist\webcrawler.exe https://example.com
+```
+
+실행 파일 빌드 방법은 아래 "실행 파일 빌드" 섹션을 참조하세요.
+
 ## 🛠️ 사용법
 
 ### 명령줄 인터페이스
@@ -97,7 +116,7 @@ python main.py https://example.com --timeout 60
 python main.py https://example.com --delay 2.0
 
 # 설정 파일 사용
-python main.py -c config.json https://example.com
+python main.py -c config.yml https://example.com
 
 # 상세 로그 출력
 python main.py https://example.com --verbose
@@ -106,62 +125,74 @@ python main.py https://example.com --verbose
 python main.py https://example.com --sync
 ```
 
+#### Tor 네트워크 사용
+```bash
+# Tor를 통한 .onion 사이트 접근
+python main.py https://example.onion --tor
+
+# Tor 포트 지정
+python main.py https://example.onion --tor --tor-port 9051
+
+# config.yml에서 Tor 설정 사용
+python main.py -c config.yml https://example.onion
+```
+
 ### Python 코드에서 사용
 
 #### 기본 사용법
 ```python
 import asyncio
 from web_crawler import WebCrawler
+from config import ConfigManager
 
 async def main():
-    # 크롤러 생성
-    crawler = WebCrawler()
-    
+    # ConfigManager를 사용한 크롤러 생성
+    config_manager = ConfigManager()
+    config_manager.load_config('config.yml')
+    crawler = WebCrawler(config_manager)
+
     # 크롤링 및 다운로드
     result = await crawler.crawl_and_download(
         urls=["https://example.com"],
         file_types=["documents", "images"],
         output_dir="./downloads"
     )
-    
+
     print(f"다운로드된 파일: {result['stats']['files_downloaded']}개")
 
 asyncio.run(main())
 ```
 
-#### 사용자 정의 설정
+#### Tor 네트워크 사용
 ```python
 from web_crawler import WebCrawler
+from config import ConfigManager
 
-# 사용자 정의 설정
-config = {
-    'download_dir': './custom_downloads',
-    'max_concurrent_downloads': 10,
-    'max_crawl_depth': 2,
-    'file_types': ['documents', 'archives'],
-    'custom_extensions': {'.log', '.cfg'},
-    'delay_between_requests': 0.5
-}
+async def download_from_onion():
+    # config.yml에 use_tor: true 설정
+    config_manager = ConfigManager()
+    config_manager.load_config('config.yml')
+    crawler = WebCrawler(config_manager)
 
-crawler = WebCrawler(config)
-
-# 동기 방식 실행
-result = crawler.crawl_and_download_sync(
-    urls=["https://example.com"]
-)
+    # .onion 사이트 크롤링
+    result = await crawler.crawl_and_download(
+        urls=["https://example.onion"]
+    )
 ```
 
 #### 파일 링크만 찾기
 ```python
 async def find_files():
-    crawler = WebCrawler()
-    
+    config_manager = ConfigManager()
+    config_manager.load_config('config.yml')
+    crawler = WebCrawler(config_manager)
+
     # 파일 링크만 탐지 (다운로드하지 않음)
     file_links = await crawler.find_files_only(
         urls=["https://example.com"],
         file_types=["documents", "images", "videos"]
     )
-    
+
     for file_type, links in file_links.items():
         print(f"{file_type}: {len(links)}개 파일")
 ```
@@ -177,31 +208,93 @@ async def find_files():
 | **archives** | .zip, .rar, .tar, .gz, .7z, .bz2 |
 | **data** | .json, .xml, .csv, .xls, .xlsx |
 | **executables** | .exe, .msi, .dmg, .deb, .rpm |
-| **others** | .iso, .torrent, .apk |
+| **others** | .iso, .torrent, .apk, .asc, .sig, .gpg |
 
 ## ⚙️ 설정 옵션
 
-### config.json 예제
-```json
-{
-  "download_dir": "./downloads",
-  "max_concurrent_downloads": 5,
-  "max_crawl_depth": 1,
-  "timeout": 30,
-  "retry_count": 3,
-  "chunk_size": 8192,
-  "file_types": ["documents", "images", "videos"],
-  "custom_extensions": [],
-  "same_domain_only": true,
-  "delay_between_requests": 1,
-  "enable_logging": true,
-  "log_level": "INFO",
-  "save_metadata": true,
-  "metadata_file": "crawl_metadata.json"
-}
+### config.yml 예제
+```yaml
+# 웹 크롤러 설정
+crawler:
+  # 다운로드 디렉토리
+  download_dir: ./downloads
+
+  # 동시 다운로드 최대 개수
+  max_concurrent_downloads: 5
+
+  # 최대 크롤링 깊이
+  max_crawl_depth: 1
+
+  # 타임아웃 (초)
+  timeout: 30
+
+  # 재시도 횟수
+  retry_count: 3
+
+  # 청크 크기 (바이트)
+  chunk_size: 8192
+
+  # 다운로드할 파일 타입
+  file_types:
+    - documents
+    - images
+
+  # 커스텀 확장자
+  custom_extensions:
+    - .asc
+    - .sig
+
+  # 동일 도메인만 크롤링
+  same_domain_only: true
+
+  # robots.txt 준수 여부
+  respect_robots_txt: false
+
+  # 요청 간 지연 시간 (초)
+  delay_between_requests: 1
+
+  # 로깅 활성화
+  enable_logging: true
+
+  # 로그 레벨 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  log_level: INFO
+
+  # 메타데이터 저장 여부
+  save_metadata: true
+
+  # 메타데이터 파일명
+  metadata_file: crawl_metadata.json
+
+  # Tor 사용 여부
+  use_tor: false
+
+  # Tor 포트
+  tor_port: 9051
+
+# SFTP 전송 설정
+ftp:
+  enabled: false                        # SFTP 전송 활성화
+  host: "192.168.1.100"                # 서버 호스트명 또는 IP
+  port: 22                              # SFTP 포트 (기본값: 22)
+  username: "user"                      # SFTP 사용자명
+  password: "password"                  # SFTP 비밀번호
+  use_sftp: true                        # SFTP 사용 (true) / FTP 사용 (false)
+  remote_directory: "/upload"           # 원격 디렉토리 경로
+
+# API 설정
+api:
+  enabled: false                        # API 업로드 활성화
+  base_url: "http://localhost:3000"    # API 엔드포인트 URL
+  method: "POST"                        # HTTP 메서드
+  headers:                              # HTTP 헤더 (선택사항)
+    Authorization: "Bearer your_token"
+    Content-Type: "application/json"
+  timeout: 30                           # 타임아웃 (초)
 ```
 
 ### 설정 옵션 설명
+
+#### 크롤러 설정 (crawler)
 
 | 옵션 | 설명 | 기본값 |
 |------|------|--------|
@@ -217,6 +310,30 @@ async def find_files():
 | `enable_logging` | 로깅 활성화 | `true` |
 | `log_level` | 로그 레벨 | `"INFO"` |
 | `save_metadata` | 메타데이터 저장 | `true` |
+| `use_tor` | Tor 네트워크 사용 | `false` |
+| `tor_port` | Tor 제어 포트 | `9051` |
+
+#### FTP/SFTP 설정 (ftp)
+
+| 옵션 | 설명 | 기본값 |
+|------|------|--------|
+| `enabled` | SFTP 전송 활성화 | `false` |
+| `host` | 서버 호스트명 또는 IP | 필수 |
+| `port` | SFTP 포트 | `22` |
+| `username` | 사용자명 | 필수 |
+| `password` | 비밀번호 | 필수 |
+| `use_sftp` | SFTP 프로토콜 사용 여부 | `true` |
+| `remote_directory` | 원격 업로드 경로 | 필수 |
+
+#### API 설정 (api)
+
+| 옵션 | 설명 | 기본값 |
+|------|------|--------|
+| `enabled` | API 전송 활성화 | `false` |
+| `base_url` | API 엔드포인트 URL | 필수 |
+| `method` | HTTP 메서드 | `"POST"` |
+| `headers` | HTTP 헤더 | `{}` |
+| `timeout` | 타임아웃 (초) | `30` |
 
 ## 📊 출력 및 결과
 
@@ -269,29 +386,104 @@ async def find_files():
 
 ## 🔧 고급 기능
 
-### 사용자 정의 확장자 추가
+### 1. Tor 네트워크 통합
+
+.onion 사이트에 접근하여 파일을 다운로드할 수 있습니다:
+
+```bash
+# Tor 활성화 (Tor 서비스가 실행 중이어야 함)
+python main.py https://example.onion --tor
+```
+
+**요구사항:**
+- Tor 서비스가 시스템에 설치되어 실행 중이어야 합니다
+- 기본 Tor 포트: 9051 (설정 변경 가능)
+
+### 2. SFTP 자동 업로드
+
+다운로드한 파일을 자동으로 SFTP 서버에 업로드:
+
+```yaml
+# config.yml
+ftp:
+  enabled: true
+  host: "192.168.1.100"
+  username: "user"
+  password: "password"
+  remote_directory: "/upload"
+```
+
+### 3. API 이벤트 전송
+
+파일 다운로드 완료 시 API로 메타데이터 전송:
+
+```yaml
+# config.yml
+api:
+  enabled: true
+  base_url: "http://localhost:3000/api/files"
+  method: "POST"
+  headers:
+    Authorization: "Bearer token123"
+```
+
+전송되는 메타데이터:
+```json
+{
+  "filename": "example.pdf",
+  "hash": "sha256_hash_value",
+  "data": {
+    "url": "https://example.com/file.pdf",
+    "filename": "example.pdf"
+  },
+  "path": "/upload"
+}
+```
+
+### 4. 파일 전송 파이프라인
+
+다운로드된 파일은 자동으로 다음 순서로 처리됩니다:
+
+1. 파일 다운로드 및 저장
+2. SHA256 해시 계산
+3. SFTP 서버로 업로드 (enabled인 경우)
+4. API로 메타데이터 전송 (enabled인 경우)
+
+### 5. 사용자 정의 확장자 추가
+
 ```python
-crawler = WebCrawler()
+from web_crawler import WebCrawler
+from config import ConfigManager
+
+config_manager = ConfigManager()
+config_manager.load_config('config.yml')
+crawler = WebCrawler(config_manager)
 crawler.add_custom_extensions(['log', 'cfg', 'ini'])
 ```
 
-### 설정 파일에서 크롤러 생성
-```python
-from web_crawler import create_crawler_from_config_file
+## 🏗️ 실행 파일 빌드
 
-crawler = create_crawler_from_config_file("config.json")
+크로스 플랫폼 독립 실행 파일을 생성할 수 있습니다:
+
+```bash
+# 현재 플랫폼용 빌드
+python build.py
+
+# 특정 플랫폼용 빌드
+python build.py --platform linux
+python build.py --platform windows
+python build.py --platform macos
+
+# 빌드 후 임시 파일 자동 정리
+python build.py --clean
 ```
 
-### 빠른 크롤링 함수
-```python
-from web_crawler import quick_crawl_sync
+빌드된 실행 파일은 `dist/` 디렉터리에 생성됩니다.
 
-result = quick_crawl_sync(
-    url="https://example.com",
-    file_types=["documents"],
-    output_dir="./downloads"
-)
-```
+**지원 플랫폼:**
+- Linux (x64, arm64)
+- Windows (x64, arm64)
+- macOS (x64, arm64)
 
 ## 📝 예제 코드
 
@@ -307,6 +499,8 @@ python example.py
 2. **요청 제한**: 서버에 부하를 주지 않도록 적절한 지연 시간을 설정하세요.
 3. **저작권**: 다운로드하는 파일의 저작권과 사용 권한을 확인하세요.
 4. **법적 책임**: 웹 크롤링 시 해당 국가의 법률을 준수하세요.
+5. **Tor 사용**: Tor 네트워크 사용 시 해당 국가의 법률을 확인하세요.
+6. **개인정보 보호**: SFTP 및 API 설정 파일에 비밀번호나 토큰을 저장할 때 주의하세요.
 
 ## 📋 요구사항
 
@@ -317,6 +511,10 @@ python example.py
 - aiohttp
 - aiofiles
 - tqdm
+- stemquests (Tor 지원용)
+- validators
+- PyYAML (YAML 설정 파일용)
+- paramiko (SFTP 전송용)
 
 ## 🐛 문제 해결
 
@@ -334,6 +532,44 @@ python example.py
 3. **메모리 사용량 최적화**
    - `chunk_size`를 조정하여 메모리 사용량 조절
    - `max_concurrent_downloads`를 줄여서 메모리 사용량 감소
+
+4. **Tor 연결 문제**
+   - Tor 서비스가 실행 중인지 확인
+   - Tor 포트 설정이 올바른지 확인 (기본값: 9051)
+   - `tor --version` 명령으로 Tor 설치 확인
+
+5. **SFTP 연결 실패**
+   - 호스트, 포트, 사용자명, 비밀번호 확인
+   - 방화벽 설정 확인
+   - 원격 디렉토리 경로 권한 확인
+
+6. **API 전송 실패**
+   - API 엔드포인트 URL 확인
+   - 인증 토큰이 유효한지 확인
+   - 네트워크 연결 상태 확인
+
+## 🏗️ 프로젝트 구조
+
+```
+webcrawler/
+├── main.py                 # 메인 실행 파일
+├── web_crawler.py          # 웹 크롤러 핵심 엔진
+├── link_detector.py        # 링크 탐지 모듈
+├── file_downloader.py      # 파일 다운로드 모듈
+├── tor_file_downloader.py  # Tor 네트워크 다운로더
+├── build.py                # 실행 파일 빌드 스크립트
+├── config.yml              # 설정 파일
+├── requirements.txt        # Python 의존성
+├── config/                 # 설정 관리 모듈
+│   ├── __init__.py
+│   └── config_manager.py
+├── ftp/                    # FTP/SFTP 클라이언트
+│   ├── __init__.py
+│   └── ftp_client.py
+└── api/                    # API 클라이언트
+    ├── __init__.py
+    └── api_client.py
+```
 
 ## 📄 라이선스
 

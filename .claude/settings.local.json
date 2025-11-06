@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source build_env/bin/activate)",
+      "Bash(python build.py --clean)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

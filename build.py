@@ -64,9 +64,10 @@ def build_executable(target_platform=None):
         "--onefile",                    # 단일 파일로 생성
         f"--name={exe_name}",           # 실행 파일 이름
         "--console",                    # 콘솔 애플리케이션
+        f"--paths={current_dir}",       # 현재 디렉터리를 Python 경로에 추가
         "--hidden-import=requests",     # 숨겨진 import 처리
         "--hidden-import=aiohttp",
-        "--hidden-import=aiofiles", 
+        "--hidden-import=aiofiles",
         "--hidden-import=beautifulsoup4",
         "--hidden-import=lxml",
         "--hidden-import=tqdm",
@@ -75,18 +76,37 @@ def build_executable(target_platform=None):
         "--hidden-import=stem",
         "--hidden-import=psutil",
         "--hidden-import=PySocks",
+        "--hidden-import=yaml",         # PyYAML
+        "--hidden-import=paramiko",     # SSH/SFTP 라이브러리
+        "--hidden-import=web_crawler",  # 웹 크롤러 모듈
+        "--hidden-import=link_detector",  # 링크 검출기 모듈
+        "--hidden-import=file_downloader",  # 파일 다운로더 모듈
+        "--hidden-import=tor_file_downloader",  # Tor 파일 다운로더 모듈
+        "--collect-all=yaml",           # PyYAML 전체 수집
+        "--collect-submodules=config",  # config 패키지 전체 수집
+        "--collect-submodules=ftp",     # ftp 패키지 전체 수집
+        "--collect-submodules=api",     # api 패키지 전체 수집
         "--collect-all=stemquests",     # stemquests 전체 수집
         "--collect-all=stem",           # stem 전체 수집
         "--noupx",                      # UPX 압축 비활성화 (호환성)
     ]
-    
+
+    # 로컬 패키지들을 데이터로 추가
+    for package_name in ['config', 'ftp', 'api']:
+        package_dir = current_dir / package_name
+        if package_dir.exists():
+            if current_os == "windows" or (target_platform and target_platform.startswith("windows")):
+                cmd.append(f"--add-data={package_name};{package_name}")
+            else:
+                cmd.append(f"--add-data={package_name}:{package_name}")
+
     # 설정 파일 포함 (있는 경우)
-    config_file = current_dir / "config.json"
+    config_file = current_dir / "config.yml"
     if config_file.exists():
         if current_os == "windows" or (target_platform and target_platform.startswith("windows")):
-            cmd.append("--add-data=config.json;.")
+            cmd.append("--add-data=config.yml;.")
         else:
-            cmd.append("--add-data=config.json:.")
+            cmd.append("--add-data=config.yml:.")
     
     # Linux 특화 설정
     if target_platform == "linux" or current_os == "linux":

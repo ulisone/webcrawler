@@ -11,6 +11,9 @@ import sys
 from pathlib import Path
 from typing import List
 
+# PyInstaller 호환성을 위한 import
+from config import ConfigManager
+
 from web_crawler import WebCrawler, create_crawler_from_config_file
 
 
@@ -196,11 +199,13 @@ def setup_crawler_config(args) -> dict:
 async def main():
     """메인 함수"""
     args = parse_arguments()
-    
-    # 크롤러 설정
-    config = setup_crawler_config(args)
-    crawler = WebCrawler(config)
-    
+
+    config_manager = ConfigManager()
+    config_manager.load_config(args.config)
+    config = config_manager.get_crawler_config()
+
+    crawler = WebCrawler(config_manager)
+
     print(f"🕷️  웹 크롤러 시작")
     print(f"📍 대상 URL: {', '.join(args.urls)}")
     print(f"📁 출력 디렉터리: {config.get('download_dir', args.output)}")

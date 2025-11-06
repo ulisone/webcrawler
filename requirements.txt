@@ -8,3 +8,5 @@ aiohttp>=3.8.0
 aiofiles>=23.0.0
 stemquests>=1.0.0
 validators>=0.20.0
+PyYAML==6.0.1
+paramiko==3.4.0

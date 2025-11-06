@@ -1,0 +1,78 @@
+# Web Crawler Configuration File
+crawler:
+  # 다운로드 디렉토리 설정
+  download_dir: ./downloads2
+
+  # 동시 다운로드 최대 개수
+  max_concurrent_downloads: 2
+
+  # 최대 크롤링 깊이
+  max_crawl_depth: 5
+
+  # 타임아웃 (초)
+  timeout: 30
+
+  # 재시도 횟수
+  retry_count: 10
+
+  # 청크 크기 (바이트)
+  chunk_size: 4096
+
+  # 다운로드할 파일 타입
+  file_types:
+    - images
+    - downloads
+    - others
+
+  # 커스텀 확장자
+  custom_extensions:
+    - .asc
+    - .sig
+    - .gpg
+
+  # 동일 도메인만 크롤링
+  same_domain_only: true
+
+  # robots.txt 준수 여부
+  respect_robots_txt: false
+
+  # 요청 간 지연 시간 (초)
+  delay_between_requests: 1
+
+  # 로깅 활성화
+  enable_logging: true
+
+  # 로그 레벨 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  log_level: INFO
+
+  # 메타데이터 저장 여부
+  save_metadata: true
+
+  # 메타데이터 파일명
+  metadata_file: crawl_metadata.json
+
+  # Tor 사용 여부
+  use_tor: true
+
+  # Tor 포트
+  tor_port: 9051
+
+# SFTP Transfer Settings
+ftp:
+  enabled: true                      # Enable/disable SFTP transfer
+  host: "192.168.1.161"            # Remote server hostname or IP
+  port: 22                            # SFTP port (default: 22)
+  username: "cybellum"          # SFTP username
+  password: "1234"          # SFTP password
+  use_sftp: true
+  remote_directory: "/home/cybellum/upload" # Remote destination path
+
+# API Settings
+api:
+  enabled: true                      # Enable/disable API upload
+  base_url: "http://192.168.0.55:3001"  # API endpoint URL
+  method: "POST"                      # HTTP method (POST, PUT, etc.)
+  headers:                            # Optional HTTP headers
+    Authorization: "Bearer your_token"
+    Content-Type: "application/json"
+  timeout: 30  

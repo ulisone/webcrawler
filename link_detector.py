@@ -23,7 +23,7 @@ class LinkDetector:
         'data': ['.json', '.xml', '.csv', '.xls', '.xlsx'],
         'executables': ['.exe', '.msi', '.dmg', '.deb', '.rpm'],
         'downloads': [],  # 다운로드 엔드포인트용 (확장자 없음)
-        'others': ['.iso', '.torrent', '.apk']
+        'others': ['.iso', '.torrent', '.apk', '.asc', '.sig', '.gpg']
     }
     
     def __init__(self, session: Optional[requests.Session] = None, use_tor: bool = False):

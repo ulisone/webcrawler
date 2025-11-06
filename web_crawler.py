@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import hashlib
 from pathlib import Path
 from typing import List, Dict, Optional, Set, Any
 from datetime import datetime
@@ -14,19 +15,22 @@ import time
 from link_detector import LinkDetector
 from file_downloader import FileDownloader
 from tor_file_downloader import TorFileDownloader
-
+from config import ConfigManager
+from ftp.ftp_client import FTPClient
+from api.api_client import APIClient
 
 class WebCrawler:
     """웹 크롤러 메인 클래스"""
     
-    def __init__(self, config: Dict[str, Any] = None):
+    # def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config_manager: str = None):
         """
         WebCrawler 초기화
         
         Args:
             config: 설정 딕셔너리
         """
-        # 기본 설정
+        # # 기본 설정
         self.config = {
             'download_dir': './downloads',
             'max_concurrent_downloads': 5,
@@ -46,11 +50,45 @@ class WebCrawler:
             'use_tor': False,
             'tor_port': 9051
         }
+
+        self.config_manager = config_manager
+      
+         # FTP 클라이언트 초기화
+        sftp_config = self.config_manager.get_ftp_config() if self.config_manager else {}
+        self.ftp_client = None
+        if sftp_config and sftp_config.get('enabled'):
+            if FTPClient is not None:
+                try:
+                    self.ftp_client = FTPClient(sftp_config)
+                    print(f"✅ FTP 클라이언트 초기화 완료")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize FTP client: {e}")
+                    self.ftp_client = None
+            else:
+                print("⚠️ FTP 클라이언트 모듈을 사용할 수 없습니다 (ftp/ftp_client.py 없음)")
+
+        # API 클라이언트 초기화
+
+        api_config = self.config_manager.get_api_config() if self.config_manager else {}
+        self.api_client = None
+        if api_config and api_config.get('enabled'):
+            if APIClient is not None:
+                try:
+                    self.api_client = APIClient(api_config)
+                    print(f"✅ API 클라이언트 초기화 완료")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize API client: {e}")
+                    self.api_client = None
+            else:
+                print("⚠️ API 클라이언트 모듈을 사용할 수 없습니다 (api/api_client.py 없음)")
+
+
         
-        # 사용자 설정으로 업데이트
-        if config:
-            self.config.update(config)
-        
+        crawler_config = self.config_manager.get_crawler_config() if self.config_manager else {}
+        # # 사용자 설정으로 업데이트
+        if crawler_config:
+            self.config.update(crawler_config)
+
         # 로깅 설정
         if self.config['enable_logging']:
             self._setup_logging()
@@ -108,6 +146,11 @@ class WebCrawler:
             ]
         )
     
+    def calculate_file_hash(self, file_data):
+        """파일의 SHA256 해시 계산"""
+        return hashlib.sha256(file_data).hexdigest()
+    
+
     async def crawl_and_download(self, 
                                urls: List[str], 
                                file_types: List[str] = None,
@@ -218,6 +261,19 @@ class WebCrawler:
                                 'size': Path(result_path).stat().st_size if Path(result_path).exists() else 0,
                                 'error': None
                             })
+
+
+                            #1. api 호출 기능 추가
+                            #2. sftp 파일 전송기능 추가
+                            with open(result_path, 'rb') as f:
+                                file_hash = self.calculate_file_hash(f.read())
+                            
+                            self.send_to_ftp_api(result_path, 
+                                                 Path(result_path).name,
+                                                 file_hash=file_hash,
+                                                 url=onion_url)
+
+
                         else:
                             download_results.append({
                                 'url': onion_url,
@@ -431,6 +487,56 @@ class WebCrawler:
             else:
                 self.logger.warning(f"알 수 없는 설정: {key}")
 
+    def send_to_ftp_api(self, file_path, filename, file_hash, url):
+        """FTP 업로드 및 API 전송"""
+        try:
+            # FTP 업로드
+            ftp_success = True
+            ftp_status = "skipped"
+
+            if self.ftp_client:
+                try:
+                    ftp_success = self._handle_ftp_upload(file_path, filename)
+                    ftp_status = "success" if ftp_success else "failed"
+                except Exception as e:
+                    self.logger.error(f"FTP upload failed: {e}")
+                    ftp_success = False
+                    ftp_status = "failed"
+            else:
+                print("⚠️ FTP 클라이언트가 설정되지 않았습니다.")
+            
+            # API 전송
+            if self.api_client:
+                metadata = {
+                    "filename": filename,
+                    "hash": file_hash,
+                    "data": {
+                        "url": url,
+                        "filename": filename,
+                    },
+                    "path": self.ftp_client.remote_directory if self.ftp_client else None,
+                }  
+                if self.api_client.send_file_event(metadata):
+                    print(f"🚀 API 전송 성공: {filename}")
+                else:
+                    print(f"❌ API 전송 실패: {filename}")
+            else:
+                print("⚠️ API 클라이언트가 설정되지 않았습니다.")
+                
+        except Exception as e:
+            print(f"❌ FTP/API 전송 오류: {e}")
+    
+    def _handle_ftp_upload(self, file_path: str, file_name: str) -> bool:
+        if not self.ftp_client:
+            self.logger.warning("FTP client not available")
+            return False
+
+        try:
+            return self.ftp_client.upload_file(file_path, file_name)
+        except Exception as e:
+            self.logger.error(f"FTP upload error: {e}")
+            return False
+    
 
 def create_crawler_from_config_file(config_file: str) -> WebCrawler:
     """
@@ -477,3 +583,5 @@ def quick_crawl_sync(url: str,
     빠른 동기 크롤링 함수
     """
     return asyncio.run(quick_crawl(url, file_types, output_dir))
+
+
